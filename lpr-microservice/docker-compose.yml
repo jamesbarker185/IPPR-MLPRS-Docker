@@ -1,0 +1,22 @@
+services:
+  lpr-service:
+    build: .
+    container_name: lpr-microservice
+    ports:
+      - "8000:8000"
+    volumes:
+      # Optional: Mount src for development reloading
+      # - ./src:/app/src
+      - ./logs:/app/logs
+    environment:
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 4G
