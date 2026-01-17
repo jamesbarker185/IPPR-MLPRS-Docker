@@ -15,6 +15,12 @@ class LicensePlate(BaseModel):
     area: float = Field(..., description="Area of the plate in pixels")
     # We might add method/phase info if needed for debugging
 
+class PerformanceLogs(BaseModel):
+    """Detailed performance timing for optimization experiments"""
+    preprocessing_time_ms: float = Field(..., description="Time spent in image preprocessing pipeline (9 phases)")
+    ocr_time_ms: float = Field(..., description="Time spent in OCR verification pipeline")
+    total_time_ms: float = Field(..., description="Total processing time")
+
 class DetectionResponse(BaseModel):
     success: bool
     processing_time_ms: float
@@ -22,6 +28,7 @@ class DetectionResponse(BaseModel):
     phases: Optional[Dict[str, str]] = Field(None, description="Base64 encoded images of processing phases (if requested)")
     candidates_analyzed: int
     ocr_engine: str
+    performance_logs: Optional[PerformanceLogs] = Field(None, description="Detailed performance timing (if requested)")
 
 class ImageDetectionResult(BaseModel):
     """Result for a single image in batch processing"""
@@ -31,6 +38,7 @@ class ImageDetectionResult(BaseModel):
     detections: List[LicensePlate]
     candidates_analyzed: Optional[int] = None
     error: Optional[str] = Field(None, description="Error message if processing failed")
+    performance_logs: Optional[PerformanceLogs] = Field(None, description="Detailed performance timing (if requested)")
 
 class BatchDetectionResponse(BaseModel):
     """Response for batch image processing"""

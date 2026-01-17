@@ -52,7 +52,8 @@ You can use any API client to send requests.
 - **Body Type:** `multipart/form-data`
 - **Fields:**
     - `file`: (File) Select your image file
-    - `return_phases`: (Text, optional) `true` or `false` (defaults to false)
+    - `return_phases`: (Text, optional) `true` or `false`
+    - `enable_performance_logs`: (Text, optional) `true` or `false` (for timing breakdown)
 
 ### Option C: Using Curl
 ```bash
@@ -60,6 +61,15 @@ curl -X POST "http://localhost:8000/detect" \
      -F "file=@/path/to/your/image.jpg" \
      -F "return_phases=false"
 ```
+
+### Option D: Performance Analysis
+To analyze processing time breakdown (optimization experiments):
+```bash
+curl -X POST "http://localhost:8000/detect" \
+     -F "file=@/path/to/your/image.jpg" \
+     -F "enable_performance_logs=true"
+```
+Response will include `performance_logs` with `preprocessing_time_ms` and `ocr_time_ms`.
 
 ---
 

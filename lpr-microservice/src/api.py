@@ -11,7 +11,7 @@ from PIL import Image
 from .pipeline import process_image_through_phases
 from .ocr import load_ocr_model, ocr_verification_pipeline, extract_plate_text
 from .utils import identify_state, enhance_plate_region, encode_image_base64
-from .models import DetectionResponse, LicensePlate, BoundingBox, ImageDetectionResult, BatchDetectionResponse
+from .models import DetectionResponse, LicensePlate, BoundingBox, ImageDetectionResult, BatchDetectionResponse, PerformanceLogs
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -64,7 +64,8 @@ def load_image_from_bytes(data: bytes) -> np.ndarray:
 @app.post("/detect", response_model=DetectionResponse)
 async def detect_license_plate(
     file: UploadFile = File(...),
-    return_phases: bool = Form(False)
+    return_phases: bool = Form(False),
+    enable_performance_logs: bool = Form(False)
 ):
     start_time = time.time()
     
@@ -77,10 +78,20 @@ async def detect_license_plate(
     
     # Run pipeline
     try:
-        phases, candidates = process_image_through_phases(img_np)
+        preprocess_time = None
+        ocr_time = None
         
-        # OCR Verification
-        verified_candidates = ocr_verification_pipeline(ocr_model, ocr_engine_name, candidates, phases)
+        if enable_performance_logs:
+            preprocess_start = time.time()
+            phases, candidates = process_image_through_phases(img_np)
+            preprocess_time = (time.time() - preprocess_start) * 1000
+            
+            ocr_start = time.time()
+            verified_candidates = ocr_verification_pipeline(ocr_model, ocr_engine_name, candidates, phases)
+            ocr_time = (time.time() - ocr_start) * 1000
+        else:
+            phases, candidates = process_image_through_phases(img_np)
+            verified_candidates = ocr_verification_pipeline(ocr_model, ocr_engine_name, candidates, phases)
         
         detections = []
         # Filter for candidates with text or valid text
@@ -129,13 +140,22 @@ async def detect_license_plate(
 
         processing_time = (time.time() - start_time) * 1000
         
+        perf_logs = None
+        if enable_performance_logs:
+            perf_logs = PerformanceLogs(
+                preprocessing_time_ms=preprocess_time,
+                ocr_time_ms=ocr_time,
+                total_time_ms=processing_time
+            )
+
         return DetectionResponse(
             success=True,
             processing_time_ms=processing_time,
             detections=detections,
             phases=phase_images if return_phases else None,
             candidates_analyzed=len(candidates),
-            ocr_engine=ocr_engine_name
+            ocr_engine=ocr_engine_name,
+            performance_logs=perf_logs
         )
 
     except Exception as e:
@@ -145,7 +165,8 @@ async def detect_license_plate(
 @app.post("/detect/batch", response_model=BatchDetectionResponse)
 async def detect_license_plates_batch(
     files: List[UploadFile] = File(..., description="Multiple image files to process"),
-    return_phases: bool = Form(False)
+    return_phases: bool = Form(False),
+    enable_performance_logs: bool = Form(False)
 ):
     """
     Process multiple images in a single request.
@@ -168,8 +189,20 @@ async def detect_license_plates_batch(
             img_np = load_image_from_bytes(contents)
             
             # Run pipeline
-            phases, candidates = process_image_through_phases(img_np)
-            verified_candidates = ocr_verification_pipeline(ocr_model, ocr_engine_name, candidates, phases)
+            preprocess_time = None
+            ocr_time = None
+            
+            if enable_performance_logs:
+                preprocess_start = time.time()
+                phases, candidates = process_image_through_phases(img_np)
+                preprocess_time = (time.time() - preprocess_start) * 1000
+                
+                ocr_start = time.time()
+                verified_candidates = ocr_verification_pipeline(ocr_model, ocr_engine_name, candidates, phases)
+                ocr_time = (time.time() - ocr_start) * 1000
+            else:
+                phases, candidates = process_image_through_phases(img_np)
+                verified_candidates = ocr_verification_pipeline(ocr_model, ocr_engine_name, candidates, phases)
             
             # Extract detections
             detections = []
@@ -188,13 +221,22 @@ async def detect_license_plates_batch(
             
             processing_time = (time.time() - image_start) * 1000
             
+            perf_logs = None
+            if enable_performance_logs:
+                perf_logs = PerformanceLogs(
+                    preprocessing_time_ms=preprocess_time,
+                    ocr_time_ms=ocr_time,
+                    total_time_ms=processing_time
+                )
+
             results.append(ImageDetectionResult(
                 filename=file.filename,
                 success=True,
                 processing_time_ms=processing_time,
                 detections=detections,
                 candidates_analyzed=len(candidates),
-                error=None
+                error=None,
+                performance_logs=perf_logs
             ))
             successful += 1
             
